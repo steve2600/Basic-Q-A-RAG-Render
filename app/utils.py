@@ -7,12 +7,19 @@ import requests
 from pathlib import Path
 import os
 
-# Load Voyage API key from environment
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
 if not VOYAGE_API_KEY:
     raise ValueError("❌ VOYAGE_API_KEY not found in environment")
 
 voyage = Client(api_key=VOYAGE_API_KEY)
+
+def get_splitter(num_pages: int) -> RecursiveCharacterTextSplitter:
+    if num_pages > 300:
+        return RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=300)
+    elif num_pages > 100:
+        return RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    else:
+        return RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=150)
 
 def load_pdf(path_or_url: str) -> List[Document]:
     print(f"🔧 Starting load_pdf() for: {path_or_url}", flush=True)
@@ -47,13 +54,10 @@ def load_pdf(path_or_url: str) -> List[Document]:
         print(f"❌ Error loading PDF: {e}", flush=True)
         raise
 
-    # Step 3: Split with RecursiveCharacterTextSplitter
+    # Step 3: Split using dynamic splitter
     try:
-        print("🔍 Splitting documents into chunks (700/150)...", flush=True)
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=700,
-            chunk_overlap=150
-        )
+        print("🔍 Splitting documents into chunks...", flush=True)
+        splitter = get_splitter(num_pages=len(docs))
         split_docs = splitter.split_documents(docs)
         print(f"✅ Split into {len(split_docs)} chunks.", flush=True)
     except Exception as e:
