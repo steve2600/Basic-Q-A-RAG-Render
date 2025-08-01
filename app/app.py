@@ -1,3 +1,11 @@
+"""
+=====================
+⚠️DEPRECIATED FILE ⚠️
+=====================
+
+Not part of the main program anymore
+"""
+
 from qa_chain import get_qa_chain
 
 # WE DONT NEED THIS USELESS FUNCTION

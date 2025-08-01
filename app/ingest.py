@@ -1,3 +1,11 @@
+"""
+=====================
+⚠️DEPRECIATED FILE ⚠️
+=====================
+
+Not part of the main program anymore
+"""
+
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
