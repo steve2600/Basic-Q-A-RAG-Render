@@ -38,7 +38,7 @@ def get_qa_chain(docs):
     try:
         print("🟡 Creating VoyageAI embeddings...", flush=True)
         embeddings = VoyageAIEmbeddings(
-            model="voyage-2",
+            model="voyage-3-large",
             voyage_api_key=os.getenv("VOYAGE_API_KEY")
         )
         print("✅ VoyageAI embeddings created.", flush=True)

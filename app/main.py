@@ -9,18 +9,16 @@ import tempfile
 import os
 
 from app.utils import load_pdf  # Make sure this function returns LangChain documents
+
+from langchain.prompts import PromptTemplate
 from langchain_weaviate import WeaviateVectorStore
 from langchain_voyageai import VoyageAIEmbeddings
 from langchain.chains import RetrievalQA
 from langchain_groq import ChatGroq
 
-from fastapi import FastAPI
-
 import weaviate
 from weaviate.classes.init import Auth
 import weaviate.classes as wvc
-
-import os
 
 app = FastAPI()
 
@@ -30,7 +28,7 @@ TEAM_TOKEN = "8ad62148045cbf8137a66e1d8c0974e14f62a970b4fa91afb850f461abfbadb8"
 # 🌱 Load env vars
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-WEAVIATE_URL = os.getenv("WEAVIATE_URL")  # e.g., https://xyz.weaviate.network
+WEAVIATE_URL = os.getenv("WEAVIATE_URL")
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
 
 # ✅ Initialize Weaviate client (v4 syntax)
@@ -77,13 +75,13 @@ def run_query(request: QueryRequest, authorization: Optional[str] = Header(None)
             raise ValueError("No content extracted from PDF")
 
         # 🧠 Setup embedding model
-        embeddings = VoyageAIEmbeddings(model="voyage-2", voyage_api_key=VOYAGE_API_KEY)
+        embeddings = VoyageAIEmbeddings(model="voyage-3-large", voyage_api_key=VOYAGE_API_KEY)
 
         # 🔗 Create vector store with Weaviate v4
         print("🧠 Creating Weaviate vector store...", flush=True)
         vectorstore = WeaviateVectorStore(
             client=client,
-            index_name="Document",  # This will be the collection name
+            index_name="Document",
             text_key="text",
             embedding=embeddings,
         )
@@ -91,11 +89,38 @@ def run_query(request: QueryRequest, authorization: Optional[str] = Header(None)
         vectorstore.add_documents(docs)
         print("✅ Documents added to Weaviate", flush=True)
 
-        # 🧠 Setup RetrievalQA with Groq
+        # ✍️ Custom Prompt Template
+        prompt_template = PromptTemplate(
+            input_variables=["context", "question"],
+            template=
+"""
+You are a helpful assistant answering questions based strictly on the provided insurance policy document.
+
+Answer the question below using ONLY the given context. Be direct and factual. Do not say things like "according to the context." If the answer is not found, reply: "Not mentioned in the policy document."
+
+Use no more than 2 sentences.
+
+Context:
+{context}
+
+Question:
+{question}
+
+Answer:
+""".strip()
+        )
+
+        # 🤖 Setup RetrievalQA with Groq LLM
         print("🤖 Initializing QA chain with Groq LLM...", flush=True)
         qa = RetrievalQA.from_chain_type(
-            llm=ChatGroq(temperature=0, model_name="mixtral-8x7b-32768", api_key=GROQ_API_KEY),
+            llm=ChatGroq(
+                temperature=0,
+                model_name="llama3-70b-8192",
+                api_key=GROQ_API_KEY
+            ),
             retriever=vectorstore.as_retriever(),
+            chain_type="map_reduce",
+            chain_type_kwargs={"prompt": prompt_template},
             return_source_documents=False
         )
         print("✅ QA chain ready", flush=True)
@@ -120,7 +145,7 @@ def run_query(request: QueryRequest, authorization: Optional[str] = Header(None)
             os.remove(pdf_path)
             print(f"🧹 Deleted temporary file: {pdf_path}", flush=True)
 
-# Add this to properly close the connection when the app shuts down
+# Graceful shutdown
 @app.on_event("shutdown")
 def shutdown_event():
     client.close()
